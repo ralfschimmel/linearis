@@ -35,7 +35,51 @@ interface DocumentUpdateOptions {
  */
 interface DocumentListOptions {
   project?: string;
+  issue?: string;
   limit?: string;
+}
+
+/**
+ * Extract document slug ID from a Linear document URL
+ *
+ * Linear document URLs have the format:
+ * https://linear.app/[workspace]/document/[title-slug]-[slugId]
+ *
+ * The slugId is the last segment after the final hyphen in the document path.
+ *
+ * @param url URL to parse
+ * @returns Document slug ID if URL is a Linear document, null otherwise
+ */
+function extractDocumentIdFromUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes("linear.app")) {
+      return null;
+    }
+
+    // Path format: /[workspace]/document/[title-slug]-[slugId]
+    const pathParts = parsed.pathname.split("/");
+    const docIndex = pathParts.indexOf("document");
+    if (docIndex === -1 || docIndex >= pathParts.length - 1) {
+      return null;
+    }
+
+    // The slug is the part after "document", like "my-doc-title-abc123"
+    // The slugId is the last segment after the final hyphen
+    const docSlug = pathParts[docIndex + 1];
+    const lastHyphenIndex = docSlug.lastIndexOf("-");
+    if (lastHyphenIndex === -1) {
+      // No hyphen found - the entire slug might be the ID
+      return docSlug || null;
+    }
+
+    return docSlug.substring(lastHyphenIndex + 1) || null;
+  } catch {
+    // URL constructor throws on malformed URLs - treat as non-Linear URL
+    // This is intentional: attachments may contain arbitrary URLs that aren't
+    // valid, and we simply skip them rather than failing the entire operation
+    return null;
+  }
 }
 
 /**
@@ -203,15 +247,27 @@ export function setupDocumentsCommands(program: Command): void {
    * List documents
    *
    * Command: `linearis documents list [options]`
+   *
+   * Can filter by project OR by issue. When filtering by issue, the command
+   * finds all attachments on that issue, identifies which point to Linear
+   * documents, and fetches those documents.
    */
   documents
     .command("list")
     .description("List documents")
     .option("--project <project>", "filter by project name or ID")
+    .option("--issue <issue>", "filter by issue (shows documents attached to the issue)")
     .option("-l, --limit <limit>", "maximum number of documents", "50")
     .action(
       handleAsyncCommand(
         async (options: DocumentListOptions, command: Command) => {
+          // Validate mutually exclusive options
+          if (options.project && options.issue) {
+            throw new Error(
+              "Cannot use --project and --issue together. Choose one filter.",
+            );
+          }
+
           const rootOpts = command.parent!.parent!.opts();
           const [documentsService, linearService] = await Promise.all([
             createGraphQLDocumentsService(rootOpts),
@@ -226,6 +282,36 @@ export function setupDocumentsCommands(program: Command): void {
             );
           }
 
+          // Handle --issue filter: find documents via attachments
+          if (options.issue) {
+            const attachmentsService =
+              await createGraphQLAttachmentsService(rootOpts);
+            const issueId = await linearService.resolveIssueId(options.issue);
+            const attachments = await attachmentsService.listAttachments(issueId);
+
+            // Extract document slug IDs from Linear document URLs and deduplicate
+            const documentSlugIds = [
+              ...new Set(
+                attachments
+                  .map((att) => extractDocumentIdFromUrl(att.url))
+                  .filter((id): id is string => id !== null),
+              ),
+            ];
+
+            if (documentSlugIds.length === 0) {
+              outputSuccess([]);
+              return;
+            }
+
+            const documents = await documentsService.listDocumentsBySlugIds(
+              documentSlugIds,
+              limit,
+            );
+            outputSuccess(documents);
+            return;
+          }
+
+          // Handle --project filter or no filter
           let projectId: string | undefined;
           if (options.project) {
             projectId = await linearService.resolveProjectId(options.project);
