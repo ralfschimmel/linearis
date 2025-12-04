@@ -6,6 +6,7 @@ import {
   GET_DOCUMENT_QUERY,
   LIST_DOCUMENTS_QUERY,
   DELETE_DOCUMENT_MUTATION,
+  LIST_DOCUMENTS_BY_IDS_QUERY,
 } from "../queries/documents.js";
 import {
   LinearDocument,
@@ -133,6 +134,38 @@ export class GraphQLDocumentsService {
     }
 
     return true;
+  }
+
+  /**
+   * List documents by their slug IDs
+   *
+   * Used for batch-fetching documents, e.g., when retrieving documents
+   * linked to an issue via URL attachments.
+   *
+   * @param slugIds Array of document slug IDs (the short ID at the end of document URLs)
+   * @param limit Maximum number of documents to return
+   * @returns Array of documents (may be fewer if some slugIds don't exist or exceed limit)
+   */
+  async listDocumentsBySlugIds(
+    slugIds: string[],
+    limit?: number,
+  ): Promise<Document[]> {
+    if (slugIds.length === 0) {
+      return [];
+    }
+
+    const filter = {
+      or: slugIds.map((slugId) => ({ slugId: { eq: slugId } })),
+    };
+
+    const result = await this.graphqlService.rawRequest<{
+      documents: { nodes: Document[] };
+    }>(LIST_DOCUMENTS_BY_IDS_QUERY, {
+      first: limit ?? slugIds.length,
+      filter,
+    });
+
+    return result.documents.nodes;
   }
 }
 
