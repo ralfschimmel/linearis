@@ -349,3 +349,77 @@ export interface AttachmentCreateInput {
   commentBody?: string;
   iconUrl?: string;
 }
+
+// Project CRUD types
+
+/**
+ * Extended LinearProject with full details for read command
+ */
+export interface LinearProjectWithDetails extends LinearProject {
+  slugId: string;
+  icon?: string;
+  color?: string;
+  priority?: number;
+  sortOrder?: number;
+  startDate?: string;
+  members?: Array<{
+    id: string;
+    name: string;
+  }>;
+  projectMilestones?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    targetDate?: string;
+    sortOrder?: number;
+  }>;
+  issues?: LinearIssue[];
+}
+
+/**
+ * Options for projects list command
+ */
+export interface ProjectListOptions {
+  limit?: string;
+  includeArchived?: boolean;
+}
+
+/**
+ * Options for projects read command
+ */
+export interface ProjectReadOptions {
+  milestonesFirst?: string;
+  issuesFirst?: string;
+}
+
+/**
+ * Options for projects create command
+ */
+export interface ProjectCreateOptions {
+  team: string; // Required: team key, name, or ID
+  description?: string;
+  icon?: string;
+  color?: string;
+  lead?: string; // User ID
+  priority?: string; // 0-4
+  startDate?: string; // ISO date
+  targetDate?: string; // ISO date
+}
+
+/**
+ * Options for projects update command
+ */
+export interface ProjectUpdateOptions {
+  name?: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  lead?: string;
+  priority?: string;
+  startDate?: string;
+  targetDate?: string;
+  team?: string; // Add team association
+  clearLead?: boolean;
+  clearStartDate?: boolean;
+  clearTargetDate?: boolean;
+}
