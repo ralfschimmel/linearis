@@ -153,7 +153,7 @@ export interface CreateCommentArgs {
 export interface LinearComment {
   id: string;
   body: string;
-  user: {
+  user?: {
     id: string;
     name: string;
   };
