@@ -166,12 +166,17 @@ export function setupProjectsCommands(program: Command): void {
             graphQLService,
           );
 
+          const milestonesFirst = parseInt(options.milestonesFirst ?? "25");
+          const issuesFirst = parseInt(options.issuesFirst ?? "50");
+
           const result = await graphQLService.rawRequest(
             GET_PROJECT_BY_ID_QUERY,
             {
               id: projectId,
-              milestonesFirst: parseInt(options.milestonesFirst || "25"),
-              issuesFirst: parseInt(options.issuesFirst || "50"),
+              milestonesFirst: milestonesFirst || 1, // API requires >= 1, use @skip when 0
+              issuesFirst: issuesFirst || 1,
+              skipMilestones: milestonesFirst === 0,
+              skipIssues: issuesFirst === 0,
             },
           );
 

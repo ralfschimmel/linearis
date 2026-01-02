@@ -76,7 +76,7 @@ export const LIST_PROJECTS_QUERY = `
  * Get single project by ID with full details including milestones and issues
  */
 export const GET_PROJECT_BY_ID_QUERY = `
-  query GetProject($id: String!, $milestonesFirst: Int, $issuesFirst: Int) {
+  query GetProject($id: String!, $milestonesFirst: Int, $issuesFirst: Int, $skipMilestones: Boolean!, $skipIssues: Boolean!) {
     project(id: $id) {
       ${COMPLETE_PROJECT_FRAGMENT}
       members {
@@ -85,7 +85,7 @@ export const GET_PROJECT_BY_ID_QUERY = `
           name
         }
       }
-      projectMilestones(first: $milestonesFirst) {
+      projectMilestones(first: $milestonesFirst) @skip(if: $skipMilestones) {
         nodes {
           id
           name
@@ -94,7 +94,7 @@ export const GET_PROJECT_BY_ID_QUERY = `
           sortOrder
         }
       }
-      issues(first: $issuesFirst) {
+      issues(first: $issuesFirst) @skip(if: $skipIssues) {
         nodes {
           ${COMPLETE_ISSUE_FRAGMENT}
         }
